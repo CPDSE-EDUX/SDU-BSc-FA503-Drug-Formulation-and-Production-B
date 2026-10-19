@@ -92,3 +92,10 @@ Desktop.ini
 .ruff_cache/
 .coverage
 htmlcov/
+
+# --- FA503 -----------------------------------------------------------------
+# Rendered HTML guides are committed on purpose, so students can open them
+# without rendering.
+
+# Solutions are not public
+*_solution*

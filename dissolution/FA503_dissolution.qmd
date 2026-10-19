@@ -1,0 +1,414 @@
+---
+title: "Dissolution Data Analysis in R"
+author: "Sebastian Jakobsen, Sarah Mittenentzwei"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    embed-resources: true
+execute:
+  echo: true
+  warning: false
+  message: false
+---
+
+# Introduction {.unnumbered}
+
+This document walks through a complete dissolution-data workflow:
+
+1.  Setup and importing raw data
+2.  Convert absorbance → concentration
+3.  Calculate cumulative release
+4.  Compute mean & SD per time point
+5.  Plot dissolution profiles
+6.  (Optional) Fit a Weibull model
+
+All steps include explanations and runnable R code.
+
+------------------------------------------------------------------------
+
+# Initial setup
+
+**Setup R Project and load packages**
+
+Make a folder on your computer with a suitable name (e.g. 'FA503' and a subfolder called 'Dissolution'). Create an R-project; choose "existing folder" and browse to the folder 'Dissolution' you just created. This will set the working directory to this folder, which means that any files you save or import will be saved in this folder by default.
+
+Make sure to import **tidyverse** for data manipulation.
+
+```{r}
+library(tidyverse)
+```
+
+**Importing data**
+
+Save your dissolution data as a **CSV file** (Comma‑Separated Values) in your selected folder, for example:
+
+```         
+dissolution_data.csv
+```
+
+This data set should contain the following columns:
+
+-   `tablet` — tablet ID number (e.g. 1-6).
+-   `time_min` — sampling time (minutes).
+-   `absorbance` — measured absorbance at the analytical wavelength.
+-   `dilution` — dilution factor applied to the sample.
+
+Before we can begin any calculations, we need to load the raw dissolution dataset into R. CSV files can have different symbols for column separators and decimals. Depending on how your CSV is formatted, you have to use a different function to load the data:
+
+-   **Separator = comma and decimals = dot** (english standard): `data <- read_csv("dissolution_data.csv")`
+
+-   **Separator = semicolon and decimals = comma** (danish standard): `data <- read_csv2("dissolution_data.csv")`
+
+If you don't know how your data looks like, you can print the first 3 lines:
+
+```{r}
+cat(readLines("dissolution_data.csv", n = 3), sep = "\n")
+```
+
+Use `read.csv()` or `read.csv2()` to import the data into a dataframe called `data`:
+
+```{r}
+data <- read.csv("dissolution_data.csv")
+```
+
+You can now inspect the dataset using `view()`:
+
+```{r}
+view(data)
+```
+
+**Defining constants**
+
+Before starting the data analysis we want to define some constants that will be used in the calculations later on. These include the volume of the dissolution vessel, the sample volume, and the dose of API in each tablet.
+
+```{r}
+V_total  <- 900   # mL - volume of dissolution vessel
+V_sample <- 5     # mL - volume of each sample
+dose_mg  <- 200   # mg - Ibuprofen in each tablet
+```
+
+# Convert absorbance → concentration
+
+Given the following calibration curve for Ibuprofen:
+
+$$y = -0.0002667 + 0.04478 x$$
+
+Where `y = absorbance` and `x = concentration (µg/mL)`. The calibration curve is then used to convert absorbance values to concentrations (in mg/mL) by also correcting for the dilution factor.
+
+```{r}
+data <- mutate(data,
+  conc_mg_ml = ((absorbance + 0.0002667) / 0.04478) * dilution / 1000
+)
+```
+
+This creates a new column (`conc_mg_ml`) with the concentration of each sample at the different time points.
+
+# Calculate cumulative release
+
+Now the cumulative released mass of Ibuprofen needs to be calculated. This is done by calculating the mass in the vessel (900 mL) at the current time point and adding the sum of the masses from the previous samples that have been withdrawn. The following equation illustrates how this is done:
+
+$$
+m_{\text{released}} = V \cdot C_t + \sum_{i < t} (V_s \cdot C_i)
+$$ Where:
+
+-   $V$ is the volume of the dissolution vessel (here: **900 mL** of dissolution medium).
+
+-   $C_t$ is the concentration of the drug measured in the sample taken at **time (t)**.
+
+-   $V_s$ is the sample volume withdrawn at each sampling time (here: **5 mL**).
+
+-   $C_i$ represents the concentrations from all **previous sampling points** (i.e., for all (i \< t)).
+
+First we can start by determining the amount of Ibuprofen in the dissolution vessel ($V \cdot C_t$) at the different time points along with the masses removed with each sample ($C_i \cdot V_S$).
+
+```{r}
+data <- mutate(data,
+  mass_in_vessel = conc_mg_ml * V_total,  # Mass in the vessel at the current time point
+  sample_mg = conc_mg_ml * V_sample       # Mass removed with each sample
+)
+```
+
+Now we want to calculate the cumulative release of Ibuprofen using the following code.
+
+```{r}
+# Arranges data set according to tablet number and time point (ascending)
+data <- arrange(data, tablet, time_min)
+
+# Groups data by tablet number - i.e. creates 6 separate mini datasets for each tablet
+data <- group_by(data, tablet)
+
+# Add new columns with mutate
+data <- mutate(data,
+  # Calculates the accumulated sum of mg of API removed by the previous samples. 
+  # lag() shifts the dataframe to only look at previous rows than the current row.
+  # cumsum() calculates a cumulative sum of all the previous mg from samples.    
+  removed_before = lag(cumsum(sample_mg), default = 0),
+  
+  # Calculates the accumulated sum of mg released
+  mg_released = mass_in_vessel + removed_before
+)
+
+# Remove grouping from the dataframe
+data <- ungroup(data)
+```
+
+**The pipe operator**
+
+In the above code, you take your data frame, alter it, and save it again under the name `data` multiple times. The pipe operator `%>%` can be used as an alternative to connect all the function you want to apply to `data`. Think of the pipe operator as **"and then"**. This way `data %>%` means you take your dataframe `data` **and then** perform the next line of code on this dataframe. Use the pipe operator after every function to apply them all after another.
+
+```{r}
+data <- data %>%
+  
+  arrange(tablet, time_min) %>%   
+  
+  group_by(tablet) %>%
+  
+  mutate(
+    removed_before = lag(cumsum(sample_mg), default = 0),  
+    mg_released = mass_in_vessel + removed_before   
+    
+  ) %>%
+  
+  ungroup() 
+```
+
+We have now created the column `mg_released` that contains the amount of Ibuprofen released at every time point. You can inspect the dataframe to see this and also notice how this is the sum of the columns `mass_in_vessel` and `removed_before`. You should also notice the connection between `removed_before` and `sample mg` (`removed_before` is the cumulative sum of `sample mg` starting from the previous row).
+
+We can now create a new column that contains the % API released by comparing to the theoretical dose in each tablet (here, 200 mg of Ibuprofen).
+
+```{r}
+data <- mutate(data,
+  percent_released = 100 * mg_released / dose_mg
+)
+```
+
+# Calculate mean & SD per time point
+
+Now that the main data analysis is done, we want to calculate some basic summary statistics that can be used for plotting and visualizing the data. A new dataframe is created called `summary_data,` which contains the mean and standard deviation (SD) values of both the `mg_released` and `percent_released` for every time point.
+
+```{r}
+# Groups data by time points to calculate the mean and standard deviation
+grouped_data <- group_by(data, time_min)
+
+# Collapses data to one row per time point with mean and SD columns
+summary_data <- summarise(grouped_data,
+  # Calculates the mean mg released for each time point 
+  mean_mg = mean(mg_released),
+  # Calculates the standard deviation of mg released for each time point
+  sd_mg = sd(mg_released),
+  # Calculates the mean % released for each time point
+  mean_pct = mean(percent_released),
+  # Calculates the standard deviation of % released for each time point
+  sd_pct = sd(percent_released) 
+)
+```
+
+You can now inspect the new dataframe `summary_data` to see what the above code has outputted.
+
+# Plot dissolution profiles
+
+We can now plot the dissolution profiles using `ggplot`. First the mg of Ibuprofen released as a function of time is plotted as a line plot.
+
+```{r}
+# Assigns the plot to a variable so we can save it later
+plot_mg <- ggplot(                              
+  
+  # Defines which dataframe to be used for plotting 
+  # aes() is used to map valaues to the x- and y-coordinates
+  summary_data, aes(x=time_min, y=mean_mg)) +   
+  
+  # Creates lines between the plotted values
+  geom_line() +
+  
+  # Creates a dot for every data point
+  geom_point() +
+  
+  # Creates the error bars equal to one SD above and below the mean
+  # width controls how wide the horizontal caps on the error bar are
+  geom_errorbar(aes(ymin = mean_mg - sd_mg,    
+                    ymax = mean_mg + sd_mg),
+                width = 1) +           
+  
+  labs(
+       # Gives the x-axis a title
+       x = "Time (min)",         
+       
+       # Gives the y-axis a title
+       y = "Drug released (mg)") +      
+  
+  # Controls the x-axis limits and tick positions
+  scale_x_continuous(limits = c(0, 65),
+                     breaks = seq(0, 65, by = 10),
+                     expand = c(0, 0)) +
+  
+  # Controls the y-axis limits and tick positions
+  scale_y_continuous(limits = c(0, 220),
+                     breaks = seq(0, 220, by = 20),
+                     expand = c(0, 0)) +
+  
+  # Uses a classic theme for the plot
+  theme_classic()                              
+
+# We call the plot to show it
+plot_mg                                        
+```
+
+The same can now be done using the % released instead.
+
+```{r}
+plot_pct <- ggplot(
+  summary_data, aes(x=time_min, y=mean_pct)) +
+  geom_line() +
+  geom_point() +
+  geom_errorbar(aes(ymin = mean_pct - sd_pct,
+                    ymax = mean_pct + sd_pct),
+                width = 1) +
+  labs(x = "Time (min)",
+       y = "Drug released (%)") +
+  scale_x_continuous(limits = c(0, 65),
+                     breaks = seq(0, 65, by = 10),
+                     expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0, 110),
+                     breaks = seq(0, 110, by = 10),
+                     expand = c(0, 0)) +  
+  theme_classic()
+
+plot_pct
+```
+
+We can now save the two plots to our computer in the working directory defined at the beginning:
+
+```{r}
+#| eval: false
+
+# The filename which the plot will be saved under. 
+# Here .png is used but other filetypes can be used
+ggsave("dissolution_mg_plot.png",         
+       
+       # The plot we want to save.
+       plot = plot_mg,   
+       
+       # Here we can define the size and resolution of the picture
+       width = 6, height = 4, dpi = 300)  
+
+# The same is done for the % plot
+ggsave("dissolution_percent_plot.png", 
+       plot = plot_pct,
+       width = 6, height = 4, dpi = 300)
+
+```
+
+# (Optional) Fit a Weibull model
+
+Optionally, we can try to fit a model to our dissolution dataset. While there exist multiple models to fit dissolution data (see the following [Link](https://saspublishers.com/media/articles/SAJP35388-396.pdf=) for a review of models), we will here use the Weibull model:
+
+$$
+M(t) = M_0 \cdot (1-e^{-(\frac{t}{\alpha})^\beta})
+$$ Where:
+
+-   $M(t)$ is the amount/percentage of drug released at time $t$.
+-   $M_0$ is the maximum amount of drug released (e.g. 100%).
+-   $\alpha$ is a scale parameter related to time (the time where 63.2% is released, so a higher $\alpha$ = slower dissolution).
+-   $\beta$ is a shape parameter that controls the shape of the curve ($\beta$ \< 1 → parabolic curve, $\beta$ = 1 → exponential curve, $\beta$ \> 1 → sigmoidal (S-shaped) curve).
+
+First, we define the Weibull function. $M_0$ is set to `100` as we will be fitting to the % released data.
+
+```{r}
+
+weibull_fun <- function(t, alpha, beta){
+  100 * (1 - exp(-(t/alpha)^beta))
+}
+```
+
+Then we fit the Weibull model to our data using the non linear fitting function `nls()` (**N**onlinear **L**east **S**quares)
+
+```{r}
+fit <- nls(
+  # nls() attempts to find parameter values (here: alpha and beta) that make the model match 
+  # the observed data as closely as possible. 
+  # Notice that the variable names from the data set are used (mean_pct and time_min)
+  mean_pct ~ 100 * (1 - exp(-(time_min/alpha)^beta)),  
+  
+  # The dataset we are fitting our model to
+  data = summary_data,
+  
+  # Nonlinear models need initial guesses to start fitting. 
+  # They don't have to be perfect but need to be reasonable
+  start = list(alpha = 30, beta = 2)                   
+)
+```
+
+Notice how some intial guesses for the parameters `alpha` and `beta` are needed. There are different approaches to coming up with these intial values. One way is to look at the plotted data and based on the knowledge of the parameters of the model, you can quickly try to estimate these values. For instance `alpha` represents the time where 63% of the drug is released and can be easily estimated by the blot. `beta` should be based on the observed shape of the data, and since the data looks sigmoidal, a `beta < 1` is used.
+
+We can now inspect the output created by `nls()` saved in the variable `fit`. `summary()` gives a nice overview of the formula used, the best fit parameters and their associated standard error. If we just want to access the fitted paramaters `coef()` is used.
+
+```{r}
+summary(fit)
+
+coef(fit)
+
+```
+
+When wanting to assess how well the nonlinear fit fits the data, the best way is to plot it. Firstly, we need to create a dataset containing predicted values based on the fit, which can be shown as a fitted curve on the plot.
+
+```{r}
+# To get a smooth curve, 200 equally spaced time points are created between 0 and 60.
+t_smooth <- seq(0, 60, length.out = 200)   
+
+# The parameters of the fit (alpha and beta) is stored in a variable named 'params'
+params <- coef(fit)                         
+
+# The Weibull function is used to calculate a series of corresponding y-values to the 
+# t_smooth x-values using the alpha and beta values from the fit
+predicted <- weibull_fun(                   
+  t_smooth,
+  params["alpha"],
+  params["beta"]
+)
+
+# These new x-values and preedicted y-values are stored in anew dataframe (fit_df)
+fit_df <- data.frame(time = t_smooth,       
+                     percent_released = predicted)
+```
+
+Now we just need to plot the fit along with the observed data using `ggplot`. Here the observed data will be plotted as dots, while the predicted values are shown as a fitted line.
+
+```{r}
+
+ggplot() +
+  
+  # The observed data stored in 'summary_data' is plotted as dots 
+  geom_point(data = summary_data,
+             aes(time_min, mean_pct),
+             size = 3) +
+  
+  # The predicted values stored in 'fit_df' is plotted as line. 
+  # The many data point will end up giving a smooth line
+  geom_line(data = fit_df,
+            aes(time, percent_released),
+            linewidth = 1) +
+  
+  # SD error bars are plotted as before
+  geom_errorbar(data = summary_data,
+                aes(x = time_min,
+                    ymin = mean_pct - sd_pct,
+                    ymax = mean_pct + sd_pct),
+                width = 1) +
+  
+  # Axis labels for the plot 
+  labs(x = "Time (min)",
+       y = "Drug released (%)") +
+  
+  #Scaling of axis
+  scale_x_continuous(limits = c(0, 65),
+                     breaks = seq(0, 65, by = 10),
+                     expand = c(0, 0)) +
+  scale_y_continuous(limits = c(0, 110),
+                     breaks = seq(0, 110, by = 10),
+                     expand = c(0, 0)) + 
+  
+  theme_classic()
+
+```

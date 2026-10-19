@@ -1,0 +1,313 @@
+---
+title: "Particle Size Distribution — Sieve Analysis"
+author: "Sebastian Jakobsen"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    embed-resources: true
+    code-overflow: wrap 
+execute:
+  echo: true
+  warning: false
+  message: false
+  eval: false
+---
+
+# Introduction {.unnumbered}
+
+This document guides you through the data analysis for a **sieve analysis** of a powder sample. Sieve analysis is a widely used method in pharmaceutical manufacturing to characterise the **particle size distribution** of a powder by separating it into fractions using a series of sieves with progressively smaller openings.
+
+The analysis follows these steps:
+
+1.  Set up the R project, load packages, and enter the sieve data
+2.  Calculate derived quantities: bin width, midpoint, relative frequency, cumulative frequency, and frequency density
+3.  Plot a histogram of mass retained with a line overlay
+4.  Plot a histogram of frequency density
+5.  Plot a cumulative frequency curve and extract D10, D50, and D90
+
+------------------------------------------------------------------------
+
+# Initial Setup
+
+## Set up R project and load packages
+
+Create a folder on your computer with a suitable name (e.g. `FA503` with a subfolder called `Sieve_Analysis`). Create an R project by choosing *"Existing folder"* and browsing to this subfolder. This sets the working directory, meaning all files you import or save will be read from and written to this folder by default.
+
+We will use **tidyverse** for data manipulation and plotting throughout this analysis.
+
+```{r}
+library(tidyverse)
+```
+
+## Load the data
+
+Your sieve data can either be loaded from a CSV file or entered directly in R. Both approaches are shown below — use whichever is appropriate for your situation.
+
+**Option A — Load from a CSV file:**
+
+Save your sieve data as a CSV file in your project folder:
+
+```         
+sieve_data.csv
+```
+
+This file should contain the following two columns:
+
+-   `sieve_um` — the upper sieve opening size in µm (i.e. the size of the sieve the fraction was retained on)
+-   `mass_g` — the mass retained on that sieve in grams
+
+Check the first few lines to confirm the format before importing:
+
+```{r}
+#| eval: false
+cat(readLines("sieve_data.csv", n = 3), sep = "\n")
+```
+
+Then import using the appropriate function:
+
+-   **Separator = comma, decimals = dot** (English standard): `read_csv("sieve_data.csv")`
+-   **Separator = semicolon, decimals = comma** (Danish standard): `read_csv2("sieve_data.csv")`
+
+```{r}
+#| eval: false
+data <- read_csv("sieve_data.csv")
+```
+
+**Option B — Enter data directly in R:**
+
+If you do not have a CSV file, you can type the data directly into a dataframe. The values below are example data — replace them with your own measurements.
+
+```{r}
+data <- data.frame(
+  sieve_um = c(0,  63,  90,  125,  180,  250,  355,  500),
+  mass_g = c(4.25, 4.04, 14.08, 41.94, 59.84, 25.67,  0.11,  0.05)
+)
+```
+
+Inspect the dataframe to confirm it has loaded correctly:
+
+```{r}
+view(data)
+```
+
+------------------------------------------------------------------------
+
+# Data Treatment
+
+We now calculate all the derived quantities needed for the plots and analysis. Each new column is added to the dataframe using `mutate()`, which adds or modifies columns without removing existing ones. All calculations are done in a single pipeline so the dataframe is built up in one step. Some of these calculations have been left empty for you to complete. Here are some hints for functions you might need to use:
+
+-   `max_µm`: The `lead()` function can be used to shift a column down by one row. The `default` argument is used to set the value of the last row.
+
+-   `cum_mass_g` & `cum_freq`: The `cumsum()` function can be used to generate a vector of the cumulative sums.
+
+-   `rel_freq`: The `sum()` function can be used to calculate the sum of a vector/column.
+
+```{r}
+data <- data %>% 
+  mutate(
+    
+    # Lower edge of each bin (i.e. the size of the current sieve)
+    min_µm = ____ , #insert own code here
+    
+    # Upper edge of each bin (i.e one sieve size larger)
+    max_µm = ____ , #insert own code here
+    
+    # Width of each bin in µm (i.e. the size interval)
+    bin_width = ____ , #insert own code here
+    
+    # Midpoint of each bin — the average of the lower and upper edges
+    midpoint = ____ , #insert own code here
+    
+    # Cumulative mass in grams — running total from finest to coarsest
+    cum_mass_g = ____ , #insert own code here
+    
+    # Relative frequency — mass in each bin as a % of total mass
+    rel_freq = ____ , #insert own code here
+    
+    # Cumulative frequency — running total of relative frequency (%)
+    cum_freq = ____ , #insert own code here
+    
+    # Frequency density — relative frequency normalized by bin width (% per µm)
+    # This ensures bar areas represent relative frequency even when bins differ in width
+    freq_density = ____ , #insert own code here
+  )
+```
+
+Inspect the updated dataframe to confirm all columns have been calculated correctly:
+
+```{r}
+view(data)
+```
+
+------------------------------------------------------------------------
+
+# Histogram of Mass Retained
+
+We begin with the simplest representation of the data: the raw mass retained on each sieve plotted as a histogram. The bars are drawn using `geom_rect()`, which requires explicit left (`xmin`) and right (`xmax`) edges for each bar — giving us full control over the width of every bar individually. A line connecting the midpoints of each bar is overlaid to help visualise the shape of the distribution. Parts of the code have been left blank for you to fill out
+
+```{r}
+ggplot(data) +
+  
+  # Bars — width defined by sieve edges, height is mass
+  geom_rect(
+    aes(xmin = ____, xmax = ____, ymin = ____, ymax = ____), # fill in the blanks
+    fill = "white",
+    color = "steelblue",
+  ) +
+  
+  # Line plot connecting bar midpoints
+  geom_line(
+    aes(x = ____, y = ____), #fill in the blanks
+  ) +
+  
+  # Modification of the axes
+  scale_x_continuous(
+    # Sets the ticks to be equal to the edges of the bins
+    breaks = unique(c(data$min_µm, data$max_µm)),
+    # A modification to the scaling so that the origin is at zero and the right limit is 5% larger than the highest x value
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  
+  # Similar scale adjustment to the y-axis
+  scale_y_continuous(
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+
+  # Axes titles
+  labs(
+    x = "_____", #Write a title for the x-axis
+    y = "_____", #write a title for the y-axis
+  ) +
+  theme_classic()
+```
+
+Based on the histogram, what is the mode of the distribution (given as a size interval or midpoint)? What is the median? What is the mean? The median will be calculated later in the exercise but you can calculate the mean using the sum of the size midpoints and the mass within each size class
+
+```{r}
+mean_size <- ___ # write your own code
+
+# Print the value
+cat("Mean particle size:", signif(mean_size, 3), "µm\n")
+```
+
+# Histogram of Frequency Density (Optional)
+
+When bins differ in width — as they always do in a sieve series — plotting raw mass or relative frequency gives a visually misleading picture: wider bins will appear more prominent simply because they span a larger size range. **Frequency density** corrects for this by dividing the relative frequency of each bin by its width, so that the *area* of every bar equals the relative frequency for that fraction. This makes bars directly comparable regardless of their width.
+
+```{r}
+ggplot(data) +
+  
+  # Bars — width as before but here height is frequency density
+  geom_rect(
+    aes(xmin = min_µm, xmax = max_µm, ymin = 0, ymax = freq_density),
+    fill = "white",
+    color = "steelblue",
+  ) +
+  
+  # Line plot connecting the midpoints
+  geom_line(
+    aes(x = midpoint, y = freq_density),
+    color = "blue",
+  ) +
+
+   scale_x_continuous(
+    breaks = unique(c(data$min_µm, data$max_µm)),
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  
+  scale_y_continuous(
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+
+  labs(
+    x = "Particle size (µm)",
+    y = "Frequency density (% / µm)",
+  ) +
+  theme_classic() 
+```
+
+> **Tip:** Compare this plot to the mass retained histogram in the previous section. Notice how the relative heights of the bars change once bin width is accounted for. Bins that appeared dominant because of their width are rescaled, and the true shape of the distribution becomes clearer.
+
+------------------------------------------------------------------------
+
+# Cumulative Frequency and D-values
+
+The cumulative frequency curve shows the running total of relative frequency as particle size increases. It rises from 0% to 100% and its shape summarises the entire distribution in a single curve. Try plotting the curve by mapping `max_µm` to the x-axis and `cum_freq` to the y-axis.
+
+```{r}
+ggplot(data, aes(x = ___, y = ___)) +  #fill in the blanks
+  
+  geom_line() +
+  geom_point() +
+  
+  scale_x_continuous(
+    limits = c(0, max(data$max_µm)),
+    expand = expansion(mult = c(0, 0.05)),
+    breaks = seq(0, 700, 100)
+    ) +
+  scale_y_continuous(
+    limits = c(0, max(data$cum_freq)),
+    expand = expansion(mult = c(0, 0.05)),
+    breaks = seq(0, 100, 10)
+  ) +
+  labs(
+    x = "_____", #Write a title for the x-axis
+    y = "_____", #write a title for the y-axis
+  ) +
+  theme_classic()
+```
+
+**(Optional)** You can also try plotting the sieve size on a **log scale** on the x-axis, which is standard practice for particle size data, as it spreads out the fine end of the distribution and compresses the coarse end. For this purpose, the `scale_x_log10()` function is passed.
+
+```{r}
+ggplot(data, aes(x = ___, y = ___)) +  #fill in the blanks
+  
+  geom_line() +
+  geom_point() +
+  
+  scale_x_log10(
+    limits = c(50, 1000),
+  ) +
+  scale_y_continuous(
+    limits = c(0, max(data$cum_freq)),
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  labs(
+    x = "_____", #Write a title for the x-axis
+    y = "_____", #write a title for the y-axis
+  ) +
+  annotation_logticks(sides = "b") +
+  theme_classic()
+```
+
+## D-values
+
+The D-values — D10, D50, and D90 — are the particle sizes at which 10%, 50% (i.e. the median), and 90% of the cumulative frequency is reached, respectively. They are widely used in pharmaceutical specifications to summarise the distribution with three representative numbers. You can try examining your cumulative frequency plots to visually estimate these values.
+
+To accurately determine these parameters we can use the `approx()` function, which estimates values between known data points by linear interpolation. Concretely, it draws a straight line between the two data points that brackets the target value and returns the size at which that line crosses the target value (e.g. 50%). `approx()` needs at least three parameters: `x`, `y`, and `xout`.Its arguments can be confusing at first because they do not correspond to the x and y axes of the plot. Instead, think of `x` and `y` as the input and output of the interpolation: `x` is the variable you are searching along, and `y` is the variable you want to retrieve. Here we want to find the particle size at which the cumulative frequency reaches a target percentage, so `x = cum_freq` (what we are searching along) and `y = max_µm` (what we want to retrieve). `xout` is the target value on the input — in this case 10, 50, or 90%. Try using the `approx()` function to get the three D-values. You need to fill in the blanks (___).
+
+```{r}
+D10 <- approx(x = data$___,
+              y = data$___,
+              xout = ___)$y
+
+D50 <- approx(x = data$___,
+              y = data$___,
+              xout = ___)$y
+
+D90 <- approx(x = data$___,
+              y = data$___,
+              xout = ___)$y
+
+#Print results
+cat("D10 =", signif(D10, 3), "µm
+D50 =", signif(D50, 3), "µm
+D90 =", signif(D90, 3), "µm")
+  
+```
+
+> **Note:** `approx()` returns both an x and y-value. As we are only interested in the y-value (x is equal to `xout`, which we specified), we finish line of code with `$y`to only get the y-value.
+
+Based on the results, look into chapter **2.9.35.** in the European Pharmacopeia to classify the powder by its fineness.

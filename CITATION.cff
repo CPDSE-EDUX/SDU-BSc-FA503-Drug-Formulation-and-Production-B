@@ -1,19 +1,25 @@
 cff-version: 1.2.0
 message: "If you use these materials in teaching, research, or derived work, please cite as below."
-title: "[[ Course title ]]"
-abstract: "[[ One-paragraph description of the course and what it teaches. ]]"
+title: "FA503: Drug Formulation and Production B"
+abstract: "R and Quarto material for FA503 Drug Formulation and Production B, a bachelor course in pharmacy at the University of Southern Denmark. Students learn to analyse experimental data in R with Quarto guides: data analysis for two laboratory exercises (dissolution testing of ibuprofen tablets, and uniformity of dosage units for ibuprofen hard capsules according to Ph. Eur. 2.9.40) and an exercise class on particle size distribution by sieve analysis. The material is in English."
 authors:
-  - family-names: "[[ Surname ]]"
-    given-names: "[[ Given name ]]"
-    affiliation: "CPDSE, [[ University of Copenhagen / University of Southern Denmark ]]"
-    orcid: "https://orcid.org/0000-0000-0000-0000"
+  - family-names: "Jakobsen"
+    given-names: "Sebastian"
+    affiliation: "University of Southern Denmark"
+  - family-names: "Mittenentzwei"
+    given-names: "Sarah"
+    affiliation: "University of Southern Denmark"
+  - family-names: "Andersen"
+    given-names: "Nadia Skarnager"
+    affiliation: "University of Southern Denmark"
 version: "2026.1"
-date-released: "2026-02-01"
+date-released: "2026-10-19"
 license: CC-BY-4.0
-url: "https://github.com/[[ your-org ]]/[[ your-repo ]]"
+url: "https://github.com/CPDSE-EDUX/SDU-BSc-FA503-Drug-Formulation-and-Production-B"
 keywords:
   - teaching
   - pharmaceutical data science
   - CPDSE
-  - "[[ domain keyword e.g. cheminformatics ]]"
-  - "[[ method keyword e.g. machine-learning ]]"
+  - pharmaceutics
+  - R
+  - Quarto

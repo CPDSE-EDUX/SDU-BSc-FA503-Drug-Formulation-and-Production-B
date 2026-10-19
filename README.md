@@ -1,47 +1,52 @@
-# CPDSE Course Repository Template  (Replace with Course Title)
+# FA503: Drug Formulation and Production B
 
-When creating a new course, please follow the conventions: [https://github.com/CPDSE-EDUX/.github/blob/main/profile/README.md](https://github.com/CPDSE-EDUX/.github/blob/main/profile/README.md)
+Data science material for **FA503 Drug Formulation and Production B** (BSc Pharmacy, University of Southern Denmark). The material shows students how to analyse experimental data in R using Quarto guides.
 
-## About this repository
+This repository holds the R and Quarto material only. The full course material lives in ItsLearning. See the [course description](https://odin.sdu.dk/sitecore/index.php?a=fagbesk&id=208858&lang=en&listid=) for the course content and learning outcomes.
 
-This is material in support of exercise [XXX] in course [Course Name/Code]. Complete material lives in the closed LMS ([link](#)).
+The documents are written in English.
 
 ## Data Science Learning Outcomes
-* List
-* learning
-* outcomes
-* here
-* only mandatory for curriculum courses (e.g. copy learning outcomes from course descriptions)
+
+The learning outcomes from the official course description that this material supports. The student demonstrates the ability to:
+
+- Collect, handle and process datasets using data processing and visualization tools such as R (RStudio).
 
 ## Structure
 
-<!-- Describe how the repo is organized. Adjust to fit your course. -->
-
 ```
-├── week01/
-│   ├── slides/
-│   └── exercises/
-├── week02/
-│   ├── slides/
-│   └── exercises/
-├── data/
-└── README.md
+├── dissolution/                  Lab exercise: dissolution testing of tablets
+├── uniformity_of_dosage_units/   Lab exercise: uniformity of dosage units (Ph. Eur. 2.9.40)
+├── sieve_analysis/               Exercise class: particle size distribution by sieve analysis
+├── CITATION.cff
+├── LICENSE                       CC BY 4.0 (teaching content)
+└── LICENSE-code                  MIT (code)
 ```
 
-- `week01/`, `week02/`, ... — materials organized by week/topic
-- `data/` — datasets used across exercises
-- Each week folder contains slides and exercise files for that topic
+Each folder is self-contained: the guide and the files it needs sit together, so students can download a single folder and work from it.
 
 ## Setup
 
-<!-- List prerequisites and setup steps needed to run the materials locally. -->
+You need:
 
-To run the materials in this repository, you will need:
+* [R](https://cran.r-project.org/)
+* [RStudio](https://posit.co/download/rstudio-desktop/) (includes Quarto)
 
-- [Software/language, e.g. R (>= 4.x)]
-- [IDE/editor, e.g. RStudio / VS Code]
-- [Any packages/dependencies, e.g. `install.packages(c("tidyverse", "..."))`]
+Install the R package used in the course:
 
-## License
+```r
+install.packages("tidyverse")
+```
 
-See [LICENSE](LICENSE) for details on how you may use and adapt this material.
+## Versions
+
+The `main` branch holds the material for the current year. When a course run ends, it is archived in a branch named after the year (for example `2026`).
+
+## Citation and license
+
+If you reuse or adapt the material, please cite it using [CITATION.cff](CITATION.cff) (GitHub shows a "Cite this repository" button).
+
+Teaching content is licensed under [CC BY 4.0](LICENSE) and code under [MIT](LICENSE-code).
+
+Part of the [CPDSE](https://github.com/CPDSE-EDUX) teaching material from the Center for Pharmaceutical Data Science Education.
+

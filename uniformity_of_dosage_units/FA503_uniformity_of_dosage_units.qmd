@@ -1,0 +1,311 @@
+---
+title: "Uniformity of Dosage Units — EP 2.9.40"
+author: "Sebastian Jakobsen"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    embed-resources: true
+    code-overflow: wrap
+execute:
+  echo: true
+  warning: false
+  message: false
+  eval: false
+---
+
+# Introduction {.unnumbered}
+
+This document guides you through the data analysis for the **Uniformity of Dosage Units** test described in European Pharmacopoeia (EP) chapter **2.9.40**. You have manufactured hard-shell capsules containing **Ibuprofen 75 mg** with a mannitol/Aerosil filler and will now determine whether your batch meets the release criteria.
+
+The analysis follows these steps:
+
+1.  Set up the R project, load packages, import data, and define key constants
+2.  Calculate the Ibuprofen content per mg of powder from the assay
+3.  Calculate the Ibuprofen content and % of label claim for each capsule
+4.  Apply the EP 2.9.40 acceptance criteria
+
+------------------------------------------------------------------------
+
+# Initial Setup
+
+## Set up R project and load packages
+
+Create a folder on your computer with a suitable name (e.g. `FA503` with a subfolder called `Capsule_Uniformity`). Create an R project by choosing *"Existing folder"* and browsing to this subfolder. This sets the working directory, meaning all files you import or save will be read from and written to this folder by default.
+
+We will use **tidyverse** for data manipulation and plotting throughout this analysis.
+
+```{r}
+library(tidyverse)
+```
+
+## Import data
+
+Save your capsule weighing data as a CSV file in your project folder:
+
+```         
+capsule_mass.csv
+```
+
+This file should contain the following columns:
+
+-   `capsule_nr` — capsule identifier (e.g. 1–30)
+-   `mass_filled_mg` — mass of the filled capsule (mg)
+-   `mass_empty_mg` — mass of the empty capsule shell (mg)
+
+CSV files can be formatted differently depending on your system. Check the first few lines to see which separator and decimal format is used:
+
+```{r}
+#| eval: false
+cat(readLines("capsule_mass.csv", n = 3), sep = "\n")
+```
+
+Then import the data using the appropriate function:
+
+-   **Separator = comma, decimals = dot** (English standard): `read_csv("capsule_mass.csv")`
+-   **Separator = semicolon, decimals = comma** (Danish standard): `read_csv2("capsule_mass.csv")`
+
+```{r}
+data <- read.csv("capsule_mass.csv")
+```
+
+Inspect the dataset to make sure it has loaded correctly:
+
+```{r}
+view(data)
+```
+
+## Define key constants
+
+Before starting the calculations, we define some key constants we will need. Keeping these in one place makes it easy to update the analysis if any values change.
+
+```{r}
+label_claim_mg  <- XXX    # mg - labelled API dose per capsule
+powder_mass_mg  <- XXX    # mg - mass of powder weighed for the assay
+absorbance <- XXX         # absorbance measured of diluted sample
+
+# Standard curve parameters: A = C (µg/mL) * slope + intercept
+std_slope <- XXX         # absorbance units per µg/mL
+std_intercept <- XXX     # absorbance units (y-intercept)
+```
+
+> **Note:** Replace `XXX` in `label_claim_mg`, `powder_mass_mg`, `absorbance`, `std_slope`, and `std_intercept` with the values from your own experiment and standard curve before running the analysis.
+
+------------------------------------------------------------------------
+
+# Assay — Ibuprofen Content per mg of powder
+
+Before we can calculate the Ibuprofen content of each capsule, we need to know the actual Ibuprofen concentration in the powder blend. This is determined by the UV assay you performed at 222 nm.
+
+## Dilution scheme
+
+The assay used the following dilution steps:
+
+1.  A powder mass corresponding to approximately one dose was dissolved in a **50.0 mL** volumetric flask with phosphate buffer pH 7.4.
+2.  **100 µL** of this solution was transferred to a **20.0 mL** volumetric flask and diluted to the mark.
+3.  The absorbance of this final solution was measured at **222 nm**.
+
+We can use the standard curve to find the concentration in the final flask ($C_2$), and then back-calculate to find the total amount of Ibuprofen in the original powder sample.
+
+## Calculate Ibuprofen content from absorbance
+
+We first calculate $C_2$, the concentration in the 20 mL flask, and then work back through the dilution to find the total Ibuprofen in the sample. Ultimatively, we want to determine the amount of ibuprofen per mg of powder.  
+
+> **Note:** You need to fill in the blank spots with your own code to correctly calculate the different variables. 
+
+```{r}
+# Calculate concentration (µg/mL) in the 20 mL flask (C2) from the standard curve (use the variables defined above) 
+C2 <- ___ # write your own code 
+
+# Calculate the concentration (µg/mL) in the 50 mL flask (C1)
+# C1 = C2 x V2/V1
+C1 <- ___ # write your own code
+
+# Calculate amount of Ibuprofen (mg) in the 50 mL flask
+# Amount = C x V
+amount_50mL_mg <- ___ # write your own code
+
+# Calculate mg of Ibuprofen per mg of powder blend
+ibu_per_mg_powder <- ___ # write your own code
+```
+
+You can now print the result of the calculations to see the amount of Ibuprofen per mg of powder blend. The `cat()` function combines different text strings and objects and prints the result directly to the screen. Think of it as a way to display a message made up of multiple pieces joined together. Also, pay attention to the function `signif()`. It's a very useful function that rounds a number to a specified amount of significant digits.
+
+```{r}
+cat("Ibuprofen content:", signif(ibu_per_mg_powder, 3), "mg Ibuprofen per mg powder")
+```
+
+# Ibuprofen Content per Capsule
+
+Now that we know the Ibuprofen content per mg of powder, we can calculate the drug content of each individual capsule from its fill mass.
+
+## Calculate fill mass
+
+The fill mass (net powder content) of each capsule is simply the difference between the filled and empty capsule masses. We calculate this by making a new column using the `mutate()` function.  
+
+```{r}
+data <- data %>% 
+  mutate(
+    fill_mass_mg = mass_filled_mg - mass_empty_mg
+)
+```
+
+## Calculate Ibuprofen content and % of label claim
+
+Using the `ibu_per_mg_powder` value from the assay, we can estimate the Ibuprofen content of each capsule. We then express this as a percentage of the label claim.
+
+```{r}
+data <- data %>% 
+  mutate(
+    
+  # Estimated Ibuprofen content in each capsule (mg)
+  ibu_mg = fill_mass_mg * ibu_per_mg_powder,
+  
+  # Ibuprofen content as % of label claim
+  pct_label = ibu_mg / label_claim_mg * 100
+)
+```
+
+You can now inspect the updated dataframe to see the fill mass, estimated Ibuprofen content, and % of label claim for each capsule:
+
+```{r}
+view(data)
+```
+
+------------------------------------------------------------------------
+
+# EP 2.9.40 — Uniformity of Dosage Units
+
+EP 2.9.40 evaluates batch uniformity by calculating an **Acceptance Value (AV)** that summarises how much the individual units deviate from the label claim. The test is carried out in two stages. **Stage 1** uses the first 10 capsules. If Stage 1 fails, **Stage 2** uses all 30 capsules with an additional individual content criterion.
+
+## Stage 1 — First 10 Capsules
+
+We begin by extracting the first 10 capsules and calculating the mean ($\bar{X}$) and standard deviation ($S$) of their individual contents, expressed as % of label claim.
+
+```{r}
+# Creates a new dataframe with only the first 10 capsules
+stage1 <- slice(data, 1:10)
+
+# Mean and standard deviation is calculated for % of label claim 
+X_bar_s1 <- mean(stage1$pct_label)
+S_s1     <- sd(stage1$pct_label)
+
+# Print out the result of the stage 1 mean and SD
+cat("Stage 1 — n = 10
+Mean content (X̄):", signif(X_bar_s1, 3), "% of label claim.
+Standard deviation (S):", signif(S_s1, 3), "%")
+
+```
+
+The calculation of the $AV$ and the reference value $M$ depends on where $\bar{X}$ falls:
+
+-   If $98.5\% \leq \bar{X} \leq 101.5\%$, then $M = \bar{X}$ and $AV = k \cdot S$
+-   If $\bar{X} < 98.5\%$, then $M = 98.5\%$ and $AV = 98.5 - \bar{X} + k \cdot S$
+-   If $\bar{X} > 101.5\%$, then $M = 101.5\%$ and $AV = \bar{X} - 101.5 + k \cdot S$
+
+Where $k = 2.4$ for $n = 10$ capsules. The $AV$ should be $\leq 15 \%$ (as defined by L1 in EP 2.9.40) to pass the requirement. By using `íf`, `else if`, and `else` statements we can get **R** to automatically determine how to calculate the $AV$ depending on the above conditions.
+
+```{r}
+k_s1 <- 2.4
+L1   <- 15.0
+
+if (X_bar_s1 >= 98.5 & X_bar_s1 <= 101.5) {
+  M_s1  <- X_bar_s1
+  AV_s1 <- k_s1 * S_s1
+} else if (X_bar_s1 < 98.5) {
+  M_s1  <- 98.5
+  AV_s1 <- (98.5 - X_bar_s1) + k_s1 * S_s1
+} else {
+  M_s1  <- 101.5
+  AV_s1 <- (X_bar_s1 - 101.5) + k_s1 * S_s1
+}
+
+# Prints the result
+cat("M =", signif(M_s1, 4), "%
+AV (Stage 1) =", signif(AV_s1, 3), "%\n")
+
+# Evaluates the result based on the L1 criteria
+if (AV_s1 < L1) {
+  cat("✔ PASS: The batch conforms to EP 2.9.40 at Stage 1.\n")
+} else {
+  cat("✖ FAIL at Stage 1. Proceed to Stage 2.\n")
+}
+```
+
+## Stage 2 — All 30 Capsules
+
+If Stage 1 fails, EP 2.9.40 requires testing of additional 20 capsules (i.e. 30 capsules in total). The same rules apply for determining $M$ and calculating $AV$, but now $k = 2.0$. In addition, **no individual capsule** may have a content below $(1 - L_2 \times 0.01) \cdot M$ or above $(1 + L_2 \times 0.01) \cdot M$, where $L_2 = 25.0\%$. This means no individual content may deviate more than 25% from the reference value $M$. Again we start by calculating the mean and SD using the full dataframe containing all 30 capsules.
+
+> **Note:** You need to fill in the blank spots yourself (**Hint**: You can look at the above example for Stage 1)
+
+```{r}
+
+X_bar_s2 <- ___(data$___) # fill in the function and column to calculate the mean content
+S_s2     <- ___(data$___) # fill in the function and column to calculate the SD of content
+
+cat("Stage 2 — n = 30
+Mean content (X̄):", signif(X_bar_s2,3), "% of label claim.
+Standard deviation (S):", signif(S_s2, 3), "%")
+```
+
+Next we use a similar sequence of `íf`, `else if`, and `else` statements to correctly calculate the $AV$ and determine the reference value $M$. Again, you need to **fill in** the blank spots (remember to use the new variables `X_bar_s2`, `k_s2`, `S_s2`).
+
+```{r}
+k_s2 <- 2.0
+
+if (X_bar_s2 >= 98.5 & X_bar_s2 <= 101.5) {
+  M_s2  <- ____ # fill in the blank
+  AV_s2 <- ____ # fill in the blank
+} else if (X_bar_s2 < 98.5) {
+  M_s2  <- ____ # fill in the blank
+  AV_s2 <- ____ # fill in the blank
+} else {
+  M_s2  <- ____ # fill in the blank
+  AV_s2 <- ____ # fill in the blank
+}
+
+cat("M =", signif(M_s2, 4), "%
+AV (Stage 2) =", signif(AV_s2, 3), "%")
+```
+
+Now we check the individual content criterion. As stated by EP 2.9.40 no individual content should deviate by more than $L2 = 25.0\%$ from the reference value $M$. First we define the lower and upper limits that the individual contents need to stay within. Next we use `mutate()` to check if the individual contents (`pct_label`) are within the limits and create a column (`within_L2`) containing `TRUE` or`FALSE` if the content is within the limits or outside the limits, respectively.
+
+```{r}
+L2   <- 25.0
+lower_limit = (1 - L2 * 0.01) * M_s2
+upper_limit = (1 + L2 * 0.01) * M_s2
+
+# Creates a column of TRUE and FALSE stating whether the content is within the L2 limits
+data <- mutate(data,
+  within_L2   = pct_label >= lower_limit & pct_label <= upper_limit
+)
+```
+
+You can inspect the dataframe and see if any of the individual contents are outside the limits. We can also get **R** to count how many of them are outside the limits using the `sum()` function. Here it is important to know that **R** internally represents `TRUE` as the value 1 and `FALSE` as the value 0. However, as we only want to increase our count for every `FALSE` in the column, we need to reverse these values. One way of doing that is by using the NOT operator `!`. Essentially `!` turns `TRUE` into `FALSE` and `FALSE` into `TRUE`. Combining `sum()` and `!` we can assign a new variable `n_outside_L2` with the number of capsules which content are outside the L2 limits.
+
+```{r}
+# Number of capsules, which content are outside the L2 limits
+n_outside_L2 <- sum(!data$within_L2)
+
+# Print the results
+cat("Allowed individual content range: [",
+signif(lower_limit, 3), "% -",
+signif(upper_limit, 3), "%]
+Capsules outside this range:", n_outside_L2, "\n")
+```
+
+Now you can evaluate if both the L1 and L2 requirements have been met in stage 2 and if the batch passes the EP 2.9.40 test. 
+
+## Reporting the results 
+
+The above analysis can be repeated for multiple batches of capsules and reported in a table similiar to what is shown here.
+
+| Batch | Mean ± SD   | AV  | Pass | Mean ± SD   | AV  | Outside L2 | Pass |
+|-------|-------------|-----|------|-------------|-----|------------|------|
+|       | **Stage 1** |     |      | **Stage 2** |     |            |      |
+| 1     | 98.5 ± 1.2  | 6.1 | Yes  | 99.1 ± 1.5  | 4.2 | 0          | Yes  |
+| 2     | 97.8 ± 11.0 | 15.3| No   | 98.3 ± 4.1  | 9.0 | 0          | Yes  |
+| 3     | 95.5 ± 12.3 | 18.7| No   | 97.0 ± 6.8  | 11.5| 2          | No   |
+| 4     | 99.0 ± 1.0  | 2.8 | Yes  | 99.4 ± 1.1  | 3.3 | 0          | Yes  |
+
